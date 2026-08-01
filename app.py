@@ -1,15 +1,19 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 os.environ["CREWAI_TRACING_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 import streamlit as st
-from dotenv import load_dotenv
+
 try:
     import litellm
+    litellm.api_key = os.getenv("GROQ_API_KEY")
     litellm.callbacks = []
     litellm.success_callback = []
     litellm._async_success_callback = []
     litellm.drop_params = True
     litellm.set_verbose = False
+    litellm.num_retries = 3
 except ImportError:
     pass
 
@@ -37,7 +41,7 @@ def create_crew():
         model="groq/llama-3.3-70b-versatile",
         api_key=os.getenv("GROQ_API_KEY"),
         temperature=0.1,
-        max_retries=5
+        max_retries=3
     )
     search_tool = SerperDevTool(n_results=2)
 
