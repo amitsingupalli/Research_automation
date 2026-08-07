@@ -13,24 +13,24 @@ _crewai_cache.mark_cache_breakpoint = lambda msg: msg
 load_dotenv()
 
 llm = LLM(
-    model="groq/llama-3.1-8b-instant",
+    model="groq/llama-3.3-70b-versatile",
     api_key=os.getenv("GROQ_API_KEY")
 )
-search_tool = SerperDevTool()
+search_tool = SerperDevTool(n_results=3)
 
 researcher = Agent(
     role="Research Analyst",
     goal="Find accurate, current information on {topic} from the internet",
-    backstory="You dig through the web and pull out only what matters, ignoring noise and fluff.",
+    backstory="You search the web efficiently to pull out facts, data points, context, and source URLs on any topic requested.",
     tools=[search_tool],
     llm=llm,
     verbose=True
 )
 
 writer = Agent(
-    role="Content Writer",
-    goal="Turn research into a clear, well structured answer for the user",
-    backstory="You take raw research and shape it into something a person can actually read and use.",
+    role="Content Writer & Synthesizer",
+    goal="Turn research into a clear, natural, engaging, and well-structured answer about {topic}.",
+    backstory="You shape raw research findings into readable text with dynamic subheadings matching the topic, followed by a '### Sources & References' section if sources were used.",
     llm=llm,
     verbose=True
 )
@@ -42,15 +42,20 @@ def chat():
         if query.strip().lower() == "exit":
             break
         
+        cleaned = query.strip().lower().rstrip(".!?")
+        if cleaned in {"hello", "hi", "hey", "greetings", "who are you"} or (len(cleaned.split()) <= 2 and any(g in cleaned for g in ["hello", "hi", "hey"])):
+            print("\nAnswer:\nHello! I am your AI Research Assistant. Ask me about any topic (technology, science, world news, etc.) and I will find key information for you!")
+            continue
+
         research_task = Task(
-            description="Research {topic} thoroughly using the internet. Extract the most relevant facts and context.",
-            expected_output="A concise set of well organized findings on {topic}.",
+            description="Research {topic} thoroughly using the internet. Extract key facts, relevant insights, and source URLs.",
+            expected_output="A concise list of factual findings and source URLs on {topic}.",
             agent=researcher
         )
 
         writing_task = Task(
-            description="Using the research findings, write a clear, structured answer to: {topic}",
-            expected_output="A well structured, final answer covering {topic}.",
+            description="Using research findings, answer: {topic}. Format naturally with dynamic topic headings (e.g. Overview, Key Findings, Details) and append a '### Sources & References' section at the end.",
+            expected_output="A well structured, final answer covering {topic} with sources at the end.",
             agent=writer,
             context=[research_task]
         )
