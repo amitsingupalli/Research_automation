@@ -515,13 +515,18 @@
             body: JSON.stringify(params)
           });
           const data = await res.json();
-          if (data.status === 'success') {
-            setReportText(data.data.report || data.data);
-            setTimestamp(data.data.timestamp || 'Just now');
+          if (data.status === 'success' || data.report) {
+            setReportText(data.report || 'No content generated.');
+            setTimestamp(data.timestamp || 'Just now');
+            setIsDone(true);
+          } else {
+            setReportText(`### Error\n\n${data.detail || 'Failed to complete research.'}`);
             setIsDone(true);
           }
         } catch (err) {
           setLogs(prev => [...prev, { ts: new Date().toLocaleTimeString(), level: 'warn', msg: `Error: ${err.message}` }]);
+          setReportText(`### Error\n\nUnable to connect to backend: ${err.message}`);
+          setIsDone(true);
         }
       };
 

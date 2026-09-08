@@ -18,9 +18,16 @@ try:
     import litellm
     litellm.api_key = os.getenv("GROQ_API_KEY")
     litellm.callbacks = []
+    litellm.success_callback = []
+    litellm._async_success_callback = []
     litellm.drop_params = True
+    litellm.set_verbose = False
+    litellm.num_retries = 3
 except ImportError:
     pass
+
+import crewai.llms.cache as _crewai_cache
+_crewai_cache.mark_cache_breakpoint = lambda msg: msg
 
 from crewai import Agent, Task, Crew, Process, LLM
 from crewai_tools import SerperDevTool
@@ -133,43 +140,47 @@ async def stream_research_endpoint(query: str, depth: str = "deep"):
 
 
 async def run_crew_pipeline(query: str, depth: str = "deep", sources: dict = None) -> str:
-    """Executes CrewAI sequential workflow with Groq LLM and Serper tool."""
+    """Executes CrewAI sequential workflow with Groq LLM and Serper search context."""
     llm = LLM(
-        model="groq/llama-3.3-70b-versatile",
+        model="groq/openai/gpt-oss-120b",
         api_key=os.getenv("GROQ_API_KEY"),
         temperature=0.1,
         max_retries=3
     )
 
     num_results = 5 if depth == "deep" else 3
-    search_tool = SerperDevTool(n_results=num_results)
+    search_context = ""
+    try:
+        search_tool = SerperDevTool(n_results=num_results)
+        raw_search = search_tool.run(search_query=query)
+        search_context = str(raw_search)[:3000]
+    except Exception as e:
+        search_context = f"Search note: {str(e)}"
 
     researcher = Agent(
         role="Research Analyst",
-        goal=f"Gather detailed, up-to-date, accurate information on {query} using web search tools.",
-        backstory="You are an expert analyst retrieving facts, context, data points, and source links on any given topic.",
-        tools=[search_tool],
+        goal=f"Analyze search findings and extract key facts, context, data points, and source links on '{query}'.",
+        backstory="You are an expert analyst. You inspect web search findings to organize factual details and citations without adding fluff.",
         llm=llm,
-        verbose=False,
-        max_iter=5
+        verbose=False
     )
 
     writer = Agent(
         role="Content Writer & Synthesizer",
-        goal=f"Synthesize raw research data into a clear, natural, engaging, and well-structured final report about {query}.",
+        goal=f"Synthesize raw research data into a clear, natural, engaging, and well-structured final report about '{query}'.",
         backstory="You are a versatile content writer. You structure findings into clear markdown with sections like Executive Summary, Key Findings, Detailed Analysis, and a separate '### Sources & References' section at the end.",
         llm=llm,
         verbose=False
     )
 
     research_task = Task(
-        description=f"Search for key details, facts, news, and insights about '{query}'. Extract accurate context and note source URLs.",
+        description=f"Analyze the following real-time web search findings for '{query}':\n\n{search_context}\n\nExtract accurate facts, key takeaways, and source URLs.",
         expected_output="Factual research findings and source URLs.",
         agent=researcher
     )
 
     writing_task = Task(
-        description=f"Using the research findings, answer: '{query}'. Format the answer in a clean, comprehensive markdown format using logical subheadings that fit naturally (e.g. Executive Summary, Key Findings, Detailed Analysis, etc.). List sources under a separate '### Sources & References' section at the end.",
+        description=f"Using the research findings, write a comprehensive answer to '{query}'. Format the report in clean markdown with dynamic subheadings (e.g. Executive Summary, Key Findings, Detailed Analysis). At the very end, add a separate '### Sources & References' section listing source names and URLs.",
         expected_output="A well-structured markdown report with citations.",
         agent=writer,
         context=[research_task]
