@@ -74,15 +74,29 @@ class ResearchRequest(BaseModel):
     sources: dict = {"academic": True, "web": True, "reddit": False}
 
 
+def get_frontend_html() -> str:
+    """Robustly reads frontend.py across local and Vercel serverless filesystem paths."""
+    candidate_paths = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend.py"),
+        os.path.join(os.getcwd(), "frontend.py"),
+        "frontend.py",
+        "/var/task/frontend.py"
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                pass
+    return "<h1>Agentic Research Lab</h1><p>Frontend template not found.</p>"
+
 @app.get("/", response_class=HTMLResponse)
+@app.get("/server.py", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
 async def serve_frontend():
-    """Serves frontend.py directly on root URL http://localhost:8000/"""
-    frontend_path = os.path.join(os.path.dirname(__file__), "frontend.py")
-    if not os.path.exists(frontend_path):
-        raise HTTPException(status_code=404, detail="frontend.py not found")
-    with open(frontend_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    """Serves frontend.py directly on root URL and routing aliases."""
+    return HTMLResponse(content=get_frontend_html())
 
 
 @app.post("/api/research")
