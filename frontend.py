@@ -283,10 +283,13 @@
     };
 
     /* ─── Activity Feed (State B — Left Column) ─── */
-    const ActivityFeed = ({ steps, logsOpen, onToggleLogs }) => {
-      const done = steps.filter(s => s.status === 'done').length;
-      const active = steps.find(s => s.status === 'active');
-      const progress = ((done + 0.5) / steps.length) * 100;
+    const ActivityFeed = ({ steps = [], logs = [], logsOpen = true, onToggleLogs }) => {
+      const safeSteps = Array.isArray(steps) ? steps : [];
+      const safeLogs = Array.isArray(logs) ? logs : [];
+
+      const done = safeSteps.filter(s => s && s.status === 'done').length;
+      const active = safeSteps.find(s => s && s.status === 'active');
+      const progress = safeSteps.length > 0 ? ((done + 0.5) / safeSteps.length) * 100 : 0;
 
       return (
         <div className="bg-lab-surface border border-lab-border rounded-xl flex flex-col h-full">
@@ -295,12 +298,12 @@
               <Icon name="Bot" className="text-lab-accent" />
               Agent Activity
             </h3>
-            <span className="text-[11px] font-mono text-lab-muted bg-lab-surface2 px-2 py-0.5 rounded">{done}/{steps.length} steps</span>
+            <span className="text-[11px] font-mono text-lab-muted bg-lab-surface2 px-2 py-0.5 rounded">{done}/{safeSteps.length} steps</span>
           </div>
 
           <div className="px-4 py-3 border-b border-lab-border">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-lab-muted">{active?.label || 'Complete'}</span>
+              <span className="text-xs text-lab-muted">{active?.label || (done === safeSteps.length ? 'Complete' : 'Processing...')}</span>
               <span className="text-xs font-semibold text-lab-accent font-mono">{Math.round(progress)}%</span>
             </div>
             <div className="w-full h-2 bg-lab-surface3 rounded-full overflow-hidden">
@@ -309,8 +312,8 @@
           </div>
 
           <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 space-y-1">
-            {steps.map((step, i) => (
-              <div key={step.id} className="flex items-start gap-3 py-2 px-2 rounded-lg hover:bg-lab-surface2 transition-colors">
+            {safeSteps.map((step, i) => (
+              <div key={step.id || i} className="flex items-start gap-3 py-2 px-2 rounded-lg hover:bg-lab-surface2 transition-colors">
                 <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
                   step.status === 'done' ? 'bg-lab-accent/15 text-lab-accent' :
                   step.status === 'active' ? 'bg-amber-100 text-amber-600' :
@@ -335,23 +338,27 @@
               onClick={onToggleLogs}
               className="w-full px-4 py-2.5 flex items-center justify-between text-xs font-medium text-lab-muted hover:text-lab-fg hover:bg-lab-surface2 transition-colors"
             >
-              <span className="flex items-center gap-2"><Icon name="Terminal" /> Raw Agent Logs</span>
+              <span className="flex items-center gap-2"><Icon name="Terminal" /> Raw Agent Logs ({safeLogs.length})</span>
               {logsOpen ? <Icon name="ChevronDown" /> : <Icon name="ChevronRight" />}
             </button>
             {logsOpen && (
               <div className="border-t border-lab-border bg-slate-900 max-h-52 overflow-y-auto scrollbar-thin fade-in-up">
-                {logs.map((log, i) => (
-                  <div key={i} className="px-4 py-1.5 font-mono text-[11px] leading-relaxed border-b border-white/5 flex gap-3">
-                    <span className="text-slate-500 flex-shrink-0">{log.ts}</span>
-                    <span className={`flex-shrink-0 w-10 ${log.level === 'ok' ? 'text-emerald-400' : log.level === 'warn' ? 'text-amber-400' : 'text-slate-400'}`}>
-                      {log.level.toUpperCase()}
-                    </span>
-                    <span className="text-slate-300">{log.msg}</span>
-                  </div>
-                ))}
+                {safeLogs.length === 0 ? (
+                  <div className="px-4 py-3 font-mono text-[11px] text-slate-500">Initializing agent logs...</div>
+                ) : (
+                  safeLogs.map((log, i) => (
+                    <div key={i} className="px-4 py-1.5 font-mono text-[11px] leading-relaxed border-b border-white/5 flex gap-3">
+                      <span className="text-slate-500 flex-shrink-0">{log.ts || ''}</span>
+                      <span className={`flex-shrink-0 w-10 ${log.level === 'ok' ? 'text-emerald-400' : log.level === 'warn' ? 'text-amber-400' : 'text-slate-400'}`}>
+                        {(log.level || 'info').toUpperCase()}
+                      </span>
+                      <span className="text-slate-300">{log.msg || ''}</span>
+                    </div>
+                  ))
+                )}
                 <div className="px-4 py-2 flex items-center gap-1.5">
                   <span className="w-1.5 h-3 bg-emerald-400 pulse-dot"></span>
-                  <span className="text-[11px] text-emerald-400 font-mono">Waiting for next tool call...</span>
+                  <span className="text-[11px] text-emerald-400 font-mono">Agent active...</span>
                 </div>
               </div>
             )}
@@ -595,7 +602,45 @@
       );
     };
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        console.error("React Error Boundary caught an error:", error, errorInfo);
+      }
+
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="flex flex-col items-center justify-center h-screen bg-lab-bg p-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-4 text-2xl font-bold">⚠️</div>
+              <h2 className="text-xl font-bold text-slate-800">Research View Error</h2>
+              <p className="text-sm text-slate-600 mt-2 max-w-md">{this.state.error?.toString()}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-6 px-4 py-2 bg-lab-accent text-white text-sm font-semibold rounded-lg hover:bg-lab-accent-hover transition-colors"
+              >
+                Reload App
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
   </script>
 </body>
 </html>
