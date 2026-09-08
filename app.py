@@ -141,8 +141,8 @@ def create_crew():
     )
 
     writing_task = Task(
-        description="Using the research findings, answer: {topic}. Format the answer in a clean, comprehensive markdown format using logical subheadings that fit {topic} naturally (e.g. Overview, Key Highlights, Details, Impact, etc.). Do not force irrelevant categories or templates. If web sources were referenced in research, list them clearly under a separate '### Sources & References' section at the end.",
-        expected_output="A well-structured, natural answer formatted with topic-relevant headings, followed by a '### Sources & References' section if sources were used.",
+        description="Using the research findings, answer: {topic}. Format the answer in a clean, comprehensive markdown format using logical subheadings that fit {topic} naturally (e.g. Overview, Key Highlights, Details, Impact, etc.). Whenever comparing features, benchmarks, metrics, or key data points, format them in clear Markdown tables (using | Header 1 | Header 2 | syntax). If web sources were referenced in research, list them clearly under a separate '### Sources & References' section at the end.",
+        expected_output="A well-structured, natural answer formatted with topic-relevant headings and comparison tables, followed by a '### Sources & References' section if sources were used.",
         agent=writer,
         context=[research_task]
     )

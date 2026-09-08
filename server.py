@@ -180,8 +180,8 @@ async def run_crew_pipeline(query: str, depth: str = "deep", sources: dict = Non
     )
 
     writing_task = Task(
-        description=f"Using the research findings, write a comprehensive answer to '{query}'. Format the report in clean markdown with dynamic subheadings (e.g. Executive Summary, Key Findings, Detailed Analysis). At the very end, add a separate '### Sources & References' section listing source names and URLs.",
-        expected_output="A well-structured markdown report with citations.",
+        description=f"Using the research findings, write a comprehensive answer to '{query}'. Format the report in clean markdown with dynamic subheadings (e.g. Executive Summary, Key Findings, Detailed Analysis). Whenever comparing items, metrics, features, specifications, or key data points, format them in clear Markdown tables (using | Header 1 | Header 2 | syntax). At the very end, add a separate '### Sources & References' section listing source names and URLs.",
+        expected_output="A well-structured markdown report with comparison tables and citations.",
         agent=writer,
         context=[research_task]
     )

@@ -61,6 +61,38 @@
     .progress-animate { animation: progressBar 1.5s ease-out forwards; }
     .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
     .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    /* Markdown Table Styling */
+    .prose table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.25rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.875rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+    .prose th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.625rem 0.875rem;
+      border: 1px solid #cbd5e1;
+    }
+    .prose td {
+      padding: 0.625rem 0.875rem;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+      vertical-align: top;
+    }
+    .prose tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    .prose tr:hover {
+      background-color: #f1f5f9;
+    }
   </style>
 </head>
 <body class="bg-lab-bg">
