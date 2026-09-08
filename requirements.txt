@@ -1,7 +1,5 @@
 fastapi
 uvicorn
-crewai[litellm]
-litellm>=1.0.0
 python-dotenv
 httpx
 

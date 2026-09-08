@@ -9,25 +9,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# Environment & Tracing setup
 load_dotenv()
-os.environ["CREWAI_TRACING_ENABLED"] = "false"
-os.environ["OTEL_SDK_DISABLED"] = "true"
-
-try:
-    import litellm
-    litellm.api_key = os.getenv("GROQ_API_KEY")
-    litellm.callbacks = []
-    litellm.success_callback = []
-    litellm._async_success_callback = []
-    litellm.drop_params = True
-    litellm.set_verbose = False
-    litellm.num_retries = 3
-except ImportError:
-    pass
 
 import httpx
-from crewai import Agent, Task, Crew, Process, LLM
+
+async def call_groq(messages: list, temperature: float = 0.1) -> str:
+    """Ultra-fast, lightweight Groq LLM inference via direct API without heavy local ML bloat."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY environment variable is missing. Please set it in your .env or Vercel dashboard.")
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "openai/gpt-oss-120b",
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": 4096
+    }
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        resp = await client.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"]
 
 def search_serper(query: str, n_results: int = 5) -> str:
     """Lightweight Serper API search without heavy ML dependencies."""
@@ -159,14 +165,7 @@ async def stream_research_endpoint(query: str, depth: str = "deep"):
 
 
 async def run_crew_pipeline(query: str, depth: str = "deep", sources: dict = None) -> str:
-    """Executes CrewAI sequential workflow with Groq LLM and Serper search context."""
-    llm = LLM(
-        model="groq/openai/gpt-oss-120b",
-        api_key=os.getenv("GROQ_API_KEY"),
-        temperature=0.1,
-        max_retries=3
-    )
-
+    """Executes multi-agent sequential research workflow (Analyst + Writer) with Groq LLM and Serper search context."""
     num_results = 5 if depth == "deep" else 3
     search_context = ""
     try:
@@ -175,46 +174,45 @@ async def run_crew_pipeline(query: str, depth: str = "deep", sources: dict = Non
     except Exception as e:
         search_context = f"Search note: {str(e)}"
 
-    researcher = Agent(
-        role="Research Analyst",
-        goal=f"Analyze search findings and extract key facts, context, data points, and source links on '{query}'.",
-        backstory="You are an expert analyst. You inspect web search findings to organize factual details and citations without adding fluff.",
-        llm=llm,
-        verbose=False
+    # Agent 1: Research Analyst Agent
+    analyst_system_prompt = (
+        "You are an expert Research Analyst in an autonomous multi-agent research team. "
+        "Your role is to inspect real-time web search findings, verify factual consistency, filter out noise, "
+        "and extract core data points, technical specifics, comparisons, and source URLs. "
+        "Provide an accurate, detailed factual brief with key takeaways and citations."
     )
-
-    writer = Agent(
-        role="Content Writer & Synthesizer",
-        goal=f"Synthesize raw research data into a clear, natural, engaging, and well-structured final report about '{query}'.",
-        backstory="You are a versatile content writer. You structure findings into clear markdown with sections like Executive Summary, Key Findings, Detailed Analysis, and a separate '### Sources & References' section at the end.",
-        llm=llm,
-        verbose=False
+    analyst_user_prompt = (
+        f"Research Topic: '{query}'\n\n"
+        f"Real-Time Web Search Context:\n{search_context}\n\n"
+        "Analyze these findings thoroughly and output a factual research briefing including verified data points and source URLs."
     )
+    analyst_output = await call_groq([
+        {"role": "system", "content": analyst_system_prompt},
+        {"role": "user", "content": analyst_user_prompt}
+    ], temperature=0.1)
 
-    research_task = Task(
-        description=f"Analyze the following real-time web search findings for '{query}':\n\n{search_context}\n\nExtract accurate facts, key takeaways, and source URLs.",
-        expected_output="Factual research findings and source URLs.",
-        agent=researcher
+    # Agent 2: Content Writer & Synthesizer Agent
+    writer_system_prompt = (
+        "You are an expert Content Writer & Synthesizer in an autonomous multi-agent team. "
+        "Your role is to take the factual briefing from the Research Analyst and write a comprehensive, "
+        "authoritative, and beautifully structured final research report.\n\n"
+        "CRITICAL FORMATTING GUIDELINES:\n"
+        "1. Structure your report into clear Markdown sections: Executive Summary, Key Findings, Detailed Analysis, and Takeaways.\n"
+        "2. ACCURACY & COMPARISONS: Whenever comparing products, versions, metrics, benchmarks, features, or pros/cons, you MUST format them in clean Markdown tables (using '| Header 1 | Header 2 |' syntax with proper dashed separator lines).\n"
+        "3. Ensure comparison tables have clear column names and clean row borders.\n"
+        "4. At the very end, include a dedicated '### Sources & References' section listing source names and clickable markdown URLs."
     )
-
-    writing_task = Task(
-        description=f"Using the research findings, write a comprehensive answer to '{query}'. Format the report in clean markdown with dynamic subheadings (e.g. Executive Summary, Key Findings, Detailed Analysis). Whenever comparing items, metrics, features, specifications, or key data points, format them in clear Markdown tables (using | Header 1 | Header 2 | syntax). At the very end, add a separate '### Sources & References' section listing source names and URLs.",
-        expected_output="A well-structured markdown report with comparison tables and citations.",
-        agent=writer,
-        context=[research_task]
+    writer_user_prompt = (
+        f"User Query: '{query}'\n\n"
+        f"Verified Findings from Research Analyst:\n{analyst_output}\n\n"
+        "Write the final, complete research report adhering to all formatting guidelines, markdown comparison tables, and references."
     )
+    final_report = await call_groq([
+        {"role": "system", "content": writer_system_prompt},
+        {"role": "user", "content": writer_user_prompt}
+    ], temperature=0.2)
 
-    crew = Crew(
-        agents=[researcher, writer],
-        tasks=[research_task, writing_task],
-        process=Process.sequential,
-        planning=False,
-        verbose=False
-    )
-
-    # Run in separate thread so asyncio loop remains responsive
-    result = await asyncio.to_thread(crew.kickoff, inputs={"topic": query, "feedback": "None"})
-    return str(result)
+    return final_report
 
 
 if __name__ == "__main__":
