@@ -26,11 +26,30 @@ try:
 except ImportError:
     pass
 
-import crewai.llms.cache as _crewai_cache
-_crewai_cache.mark_cache_breakpoint = lambda msg: msg
-
+import httpx
 from crewai import Agent, Task, Crew, Process, LLM
-from crewai_tools import SerperDevTool
+
+def search_serper(query: str, n_results: int = 5) -> str:
+    """Lightweight Serper API search without heavy ML dependencies."""
+    api_key = os.getenv("SERPER_API_KEY")
+    if not api_key:
+        return "Serper API key missing."
+    url = "https://google.serper.dev/search"
+    headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
+    payload = {"q": query, "num": n_results}
+    try:
+        response = httpx.post(url, headers=headers, json=payload, timeout=10.0)
+        data = response.json()
+        organic = data.get("organic", [])
+        results = []
+        for item in organic[:n_results]:
+            title = item.get("title", "")
+            snippet = item.get("snippet", "")
+            link = item.get("link", "")
+            results.append(f"Title: {title}\nLink: {link}\nSnippet: {snippet}\n")
+        return "\n".join(results) if results else "No search results found."
+    except Exception as e:
+        return f"Search error: {str(e)}"
 
 app = FastAPI(title="Agentic Research Lab Backend", version="2.1.0")
 
@@ -100,8 +119,8 @@ async def stream_research_endpoint(query: str, depth: str = "deep"):
 
         num_results = 5 if depth == "deep" else 3
         try:
-            search_tool = SerperDevTool(n_results=num_results)
-            yield fmt_event("log", {"ts": ts, "level": "ok", "msg": f"Search returned {num_results} top results."})
+            search_text = search_serper(query, n_results=num_results)
+            yield fmt_event("log", {"ts": ts, "level": "ok", "msg": f"Search returned top {num_results} results."})
         except Exception as err:
             yield fmt_event("log", {"ts": ts, "level": "warn", "msg": f"Search tool warning: {err}"})
 
@@ -151,8 +170,7 @@ async def run_crew_pipeline(query: str, depth: str = "deep", sources: dict = Non
     num_results = 5 if depth == "deep" else 3
     search_context = ""
     try:
-        search_tool = SerperDevTool(n_results=num_results)
-        raw_search = search_tool.run(search_query=query)
+        raw_search = search_serper(query, n_results=num_results)
         search_context = str(raw_search)[:3000]
     except Exception as e:
         search_context = f"Search note: {str(e)}"
