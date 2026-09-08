@@ -3,4 +3,7 @@ crewai[litellm]
 crewai-tools
 python-dotenv
 litellm>=1.0.0
+fastapi
+uvicorn
+
 

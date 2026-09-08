@@ -9,6 +9,7 @@
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -360,97 +361,50 @@
     };
 
     /* ─── Report Panel (State B — Right Column) ─── */
-    const ReportPanel = ({ topic }) => {
-      const [showSources, setShowSources] = useState(true);
+    const ReportPanel = ({ topic, reportText, isDone, timestamp }) => {
+      const renderContent = () => {
+        if (!reportText) {
+          return (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Icon name="Loader2" className="w-10 h-10 text-lab-accent mb-4" />
+              <h4 className="text-base font-semibold text-lab-fg">Researching & Synthesizing Report...</h4>
+              <p className="text-xs text-lab-muted mt-1 max-w-md">Our CrewAI agents are retrieving web sources and writing structured markdown analysis.</p>
+            </div>
+          );
+        }
+        if (window.marked) {
+          return <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: window.marked.parse(reportText) }} />;
+        }
+        return <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700 leading-relaxed">{reportText}</pre>;
+      };
 
       return (
         <div className="bg-lab-surface border border-lab-border rounded-xl flex flex-col h-full">
           <div className="px-5 py-3 border-b border-lab-border flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-lab-fg">{topic || 'Transformer Benchmark Analysis'}</h3>
-              <p className="text-[11px] text-lab-muted font-mono mt-0.5">Generated Sep 8, 2026 · 4 sources · 1,247 words</p>
+              <h3 className="text-sm font-semibold text-lab-fg">{topic || 'Research Report'}</h3>
+              <p className="text-[11px] text-lab-muted font-mono mt-0.5">{timestamp || 'Live Report Generation'}</p>
             </div>
             <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-lab-border text-lab-muted hover:text-lab-fg hover:border-slate-300 transition-colors">
-                <Icon name="Copy" /> Markdown
-              </button>
-              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-lab-surface2 border border-lab-border text-lab-fg hover:bg-lab-surface3 transition-colors">
-                <Icon name="Download" /> PDF
+              <button
+                onClick={() => navigator.clipboard.writeText(reportText || '')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-lab-border text-lab-muted hover:text-lab-fg hover:border-slate-300 transition-colors"
+              >
+                <Icon name="Copy" /> Copy
               </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-5">
-            <div className="max-w-none">
-              <h4 className="text-lg font-bold text-lab-fg mb-3">Executive Summary</h4>
-              <p className="text-sm text-slate-600 leading-relaxed mb-5">
-                Transformer efficiency has improved dramatically over the past 12 months. New architectures like
-                <strong> Mixture-of-Depths</strong> and <strong>Native Sparse Attention</strong> have reduced inference
-                costs by 40–60% while maintaining or improving benchmark performance across GLUE, MMLU, and HumanEval.
-                The most significant shift is toward compute-optimal training at scale, challenging the "bigger is always better" paradigm.
-              </p>
-
-              <h4 className="text-lg font-bold text-lab-fg mb-3">Key Findings</h4>
-              <div className="grid gap-3 mb-5">
-                {[
-                  { stat: '42%', label: 'Reduction in inference cost using MoD vs dense baselines (arXiv 2501.12345)' },
-                  { stat: '94.2%', label: 'MMLU accuracy achieved by compute-optimal 7B model, matching 70B dense baseline' },
-                  { stat: '3.1x', label: 'Throughput improvement with Native Sparse Attention on long-context tasks' },
-                ].map((f, i) => (
-                  <div key={i} className="bg-lab-surface3 border border-lab-border rounded-lg px-4 py-3 flex items-start gap-3">
-                    <span className="text-lg font-bold text-lab-accent font-mono flex-shrink-0">{f.stat}</span>
-                    <span className="text-xs text-slate-600 leading-relaxed pt-0.5">{f.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              <h4 className="text-lg font-bold text-lab-fg mb-3">Detailed Analysis</h4>
-              <p className="text-sm text-slate-600 leading-relaxed mb-3">
-                The transformer landscape in 2025 is defined by three converging trends: architectural sparsity,
-                compute-optimal scaling, and inference-time optimization. Mixture-of-Depths (MoD) models dynamically
-                allocate compute per token, routing easy tokens through smaller sub-networks while reserving full-model
-                capacity for complex reasoning <sup className="text-lab-accent cursor-pointer">[1]</sup>.
-              </p>
-              <p className="text-sm text-slate-600 leading-relaxed mb-5">
-                Native Sparse Attention extends this principle to the attention mechanism itself, reducing the quadratic
-                complexity of self-attention to near-linear for sequences beyond 128K tokens <sup className="text-lab-accent cursor-pointer">[2]</sup>.
-                Meanwhile, the Chinchilla-optimal training regime has been validated at scale, with models trained on
-                4–8x more tokens than their parameter count suggesting achieving superior performance <sup className="text-lab-accent cursor-pointer">[3]</sup>.
-              </p>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-5">
-                <p className="text-xs font-semibold text-amber-800 mb-1">⚠ Caveat</p>
-                <p className="text-xs text-amber-700 leading-relaxed">
-                  Benchmark saturation remains a concern. Several researchers note that MMLU and HumanEval may no longer
-                  differentiate frontier models meaningfully. New evaluations like GAIA and SWE-bench are gaining traction.
-                </p>
-              </div>
-
-              <h4 className="text-lg font-bold text-lab-fg mb-3">Cited Sources</h4>
-              <div className="space-y-2">
-                {SOURCES.map((src, i) => (
-                  <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-lab-border hover:border-slate-300 transition-colors cursor-pointer group">
-                    <span className="text-lg mt-0.5">{src.favicon}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-lab-accent bg-lab-accent/10 px-1.5 py-0.5 rounded">[{i + 1}]</span>
-                        <p className="text-xs font-semibold text-lab-fg line-clamp-1">{src.title}</p>
-                        <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"><Icon name="ArrowUpRight" /></span>
-                      </div>
-                      <p className="text-[11px] text-lab-muted mt-0.5 line-clamp-1">{src.domain} — {src.snippet}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-6">
+            {renderContent()}
           </div>
         </div>
       );
     };
 
     /* ─── Research View (State B) ─── */
-    const ResearchView = ({ onBack, topic }) => {
-      const [logsOpen, setLogsOpen] = useState(false);
+    const ResearchView = ({ onBack, topic, steps, logs, reportText, isDone, timestamp }) => {
+      const [logsOpen, setLogsOpen] = useState(true);
 
       return (
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -460,29 +414,33 @@
             </button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 pulse-dot"></span>
-                  Research in Progress
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-emerald-500' : 'bg-amber-500 pulse-dot'}`}></span>
+                  {isDone ? 'Research Complete' : 'Research in Progress'}
                 </span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-lab-muted">
-              <Icon name="Clock" className="w-3.5 h-3.5" />
-              <span className="font-mono">14:32 · 42s elapsed</span>
             </div>
           </div>
 
           <div className="flex-1 flex gap-4 p-4 min-h-0">
             <div className="w-[42%] min-w-0">
-              <ActivityFeed steps={REPORT_STEPS} logsOpen={logsOpen} onToggleLogs={() => setLogsOpen(o => !o)} />
+              <ActivityFeed steps={steps} logs={logs} logsOpen={logsOpen} onToggleLogs={() => setLogsOpen(o => !o)} />
             </div>
             <div className="flex-1 min-w-0">
-              <ReportPanel topic={topic} />
+              <ReportPanel topic={topic} reportText={reportText} isDone={isDone} timestamp={timestamp} />
             </div>
           </div>
         </div>
       );
     };
+
+    const INITIAL_STEPS = [
+      { id: 1, label: 'Initializing agent and search parameters', status: 'pending' },
+      { id: 2, label: 'Searching Google for latest information', status: 'pending' },
+      { id: 3, label: 'Synthesizing findings into report', status: 'pending' },
+      { id: 4, label: 'Citing sources and formatting', status: 'pending' },
+      { id: 5, label: 'Final review and quality check', status: 'pending' },
+    ];
 
     /* ─── App ─── */
     const App = () => {
@@ -492,17 +450,79 @@
       const [sidebarOpen, setSidebarOpen] = useState(false);
       const [currentQuery, setCurrentQuery] = useState('');
 
+      const [steps, setSteps] = useState(INITIAL_STEPS);
+      const [logs, setLogs] = useState([]);
+      const [reportText, setReportText] = useState('');
+      const [isDone, setIsDone] = useState(false);
+      const [timestamp, setTimestamp] = useState('');
+
       const handleStart = (params) => {
-        setCurrentQuery(params.query);
+        const query = params.query;
+        setCurrentQuery(query);
         setView('research');
+        setSteps(INITIAL_STEPS);
+        setLogs([{ ts: new Date().toLocaleTimeString(), level: 'info', msg: `Initiated research query: "${query}"` }]);
+        setReportText('');
+        setIsDone(false);
+
         const newItem = {
           id: Date.now(),
-          title: params.query.slice(0, 50),
+          title: query.slice(0, 50),
           time: 'Just now',
           snippet: `Depth: ${params.depth === 'deep' ? 'Deep Dive' : 'Quick Brief'}...`,
         };
         setHistory(h => [newItem, ...h]);
         setActiveHistory(newItem.id);
+
+        // Connect to SSE Endpoint /api/research/stream
+        if (window.EventSource) {
+          const sseUrl = `/api/research/stream?query=${encodeURIComponent(query)}&depth=${params.depth}`;
+          const eventSource = new EventSource(sseUrl);
+
+          eventSource.addEventListener('step_update', (e) => {
+            const data = JSON.parse(e.data);
+            setSteps(prev => prev.map(s => s.id === data.step_id ? { ...s, status: data.status, label: data.label || s.label } : s));
+          });
+
+          eventSource.addEventListener('log', (e) => {
+            const data = JSON.parse(e.data);
+            setLogs(prev => [...prev, data]);
+          });
+
+          eventSource.addEventListener('complete', (e) => {
+            const data = JSON.parse(e.data);
+            setReportText(data.report);
+            setTimestamp(data.timestamp);
+            setIsDone(true);
+            eventSource.close();
+          });
+
+          eventSource.onerror = (err) => {
+            console.warn("SSE error, falling back to POST REST endpoint", err);
+            eventSource.close();
+            fetchFallback(params);
+          };
+        } else {
+          fetchFallback(params);
+        }
+      };
+
+      const fetchFallback = async (params) => {
+        try {
+          const res = await fetch('/api/research', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+          });
+          const data = await res.json();
+          if (data.status === 'success') {
+            setReportText(data.data.report || data.data);
+            setTimestamp(data.data.timestamp || 'Just now');
+            setIsDone(true);
+          }
+        } catch (err) {
+          setLogs(prev => [...prev, { ts: new Date().toLocaleTimeString(), level: 'warn', msg: `Error: ${err.message}` }]);
+        }
       };
 
       useEffect(() => {
@@ -555,7 +575,15 @@
             {view === 'search' ? (
               <SearchView onStart={handleStart} />
             ) : (
-              <ResearchView onBack={() => setView('search')} topic={currentQuery} />
+              <ResearchView
+                onBack={() => setView('search')}
+                topic={currentQuery}
+                steps={steps}
+                logs={logs}
+                reportText={reportText}
+                isDone={isDone}
+                timestamp={timestamp}
+              />
             )}
           </div>
         </div>
