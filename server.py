@@ -22,12 +22,29 @@ def clean_key(val: str | None) -> str:
     cleaned = unicodedata.normalize("NFKD", val.strip().strip("'\"“”‘’` \t\r\n"))
     return "".join(c for c in cleaned if 32 <= ord(c) <= 126)
 
+def get_env_var(*keys: str) -> str:
+    """Case-insensitive and whitespace-tolerant environment variable lookup."""
+    for k in keys:
+        v = os.getenv(k)
+        if v and v.strip():
+            return v
+    # Search all os.environ keys case-insensitively and ignoring whitespace
+    target_names = {k.strip().lower() for k in keys}
+    for env_k, env_v in os.environ.items():
+        if env_k.strip().lower() in target_names and env_v and env_v.strip():
+            return env_v
+    return ""
+
 async def call_groq(messages: list, temperature: float = 0.1) -> str:
     """Ultra-fast, lightweight Groq LLM inference via direct API without heavy local ML bloat."""
-    raw_key = os.getenv("GROQ_API_KEY", "")
+    raw_key = get_env_var("GROQ_API_KEY", "GROQ_KEY", "GROQ")
     api_key = clean_key(raw_key)
     if not api_key:
-        raise ValueError("GROQ_API_KEY is missing or invalid. Please check your Vercel Environment Variables.")
+        raise ValueError(
+            "GROQ_API_KEY is missing or empty in Vercel. "
+            "Please go to Vercel Project Settings -> Environment Variables, "
+            "make sure 'GROQ_API_KEY' is added with 'Production' checked, and trigger a Redeploy."
+        )
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -47,7 +64,7 @@ async def call_groq(messages: list, temperature: float = 0.1) -> str:
 
 def search_serper(query: str, n_results: int = 5) -> str:
     """Lightweight Serper API search without heavy ML dependencies."""
-    raw_key = os.getenv("SERPER_API_KEY", "")
+    raw_key = get_env_var("SERPER_API_KEY", "SERPER_KEY", "SERPER")
     api_key = clean_key(raw_key)
     if not api_key:
         return "Serper API key missing. Please check your Vercel Environment Variables."
@@ -108,6 +125,20 @@ def get_frontend_html() -> str:
 async def serve_frontend():
     """Serves frontend.py directly on root URL and routing aliases."""
     return HTMLResponse(content=get_frontend_html())
+
+
+@app.get("/api/health")
+async def health_check():
+    """Diagnostic endpoint to inspect environment key availability on Vercel without exposing secrets."""
+    groq_k = get_env_var("GROQ_API_KEY", "GROQ_KEY")
+    serper_k = get_env_var("SERPER_API_KEY", "SERPER_KEY")
+    return {
+        "status": "online",
+        "groq_configured": bool(clean_key(groq_k)),
+        "groq_key_preview": f"{clean_key(groq_k)[:4]}...{clean_key(groq_k)[-3:]}" if len(clean_key(groq_k)) >= 8 else None,
+        "serper_configured": bool(clean_key(serper_k)),
+        "available_env_vars": [k for k in os.environ.keys() if any(sub in k.upper() for sub in ["GROQ", "SERP"])]
+    }
 
 
 @app.post("/api/research")
