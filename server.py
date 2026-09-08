@@ -13,11 +13,21 @@ load_dotenv()
 
 import httpx
 
+import unicodedata
+
+def clean_key(val: str | None) -> str:
+    """Sanitizes API keys by normalizing and stripping invisible unicode, quotes, and non-ASCII chars."""
+    if not val:
+        return ""
+    cleaned = unicodedata.normalize("NFKD", val.strip().strip("'\"“”‘’` \t\r\n"))
+    return "".join(c for c in cleaned if 32 <= ord(c) <= 126)
+
 async def call_groq(messages: list, temperature: float = 0.1) -> str:
     """Ultra-fast, lightweight Groq LLM inference via direct API without heavy local ML bloat."""
-    api_key = os.getenv("GROQ_API_KEY")
+    raw_key = os.getenv("GROQ_API_KEY", "")
+    api_key = clean_key(raw_key)
     if not api_key:
-        raise ValueError("GROQ_API_KEY environment variable is missing. Please set it in your .env or Vercel dashboard.")
+        raise ValueError("GROQ_API_KEY is missing or invalid. Please check your Vercel Environment Variables.")
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -37,9 +47,10 @@ async def call_groq(messages: list, temperature: float = 0.1) -> str:
 
 def search_serper(query: str, n_results: int = 5) -> str:
     """Lightweight Serper API search without heavy ML dependencies."""
-    api_key = os.getenv("SERPER_API_KEY")
+    raw_key = os.getenv("SERPER_API_KEY", "")
+    api_key = clean_key(raw_key)
     if not api_key:
-        return "Serper API key missing."
+        return "Serper API key missing. Please check your Vercel Environment Variables."
     url = "https://google.serper.dev/search"
     headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
     payload = {"q": query, "num": n_results}
@@ -175,7 +186,7 @@ async def stream_research_endpoint(query: str, depth: str = "deep"):
             "timestamp": time.strftime("%b %d, %Y · %H:%M")
         })
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(event_generator(), media_type="text/event-stream; charset=utf-8")
 
 
 async def run_crew_pipeline(query: str, depth: str = "deep", sources: dict = None) -> str:
