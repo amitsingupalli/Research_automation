@@ -233,16 +233,33 @@
               <p className="text-lab-muted mt-2 text-sm">The agent will search, read, synthesize, and produce a structured report with citations.</p>
             </div>
 
-            <div className="bg-lab-surface rounded-xl border border-lab-border shadow-sm">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (query.trim()) onStart({ query, depth, sources });
+              }}
+              className="bg-lab-surface rounded-xl border border-lab-border shadow-sm"
+            >
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-lab-muted"><Icon name="Search" /></div>
                 <input
                   type="text"
                   value={query}
                   onChange={e => setQuery(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (query.trim()) onStart({ query, depth, sources });
+                    }
+                  }}
                   placeholder="e.g. Latest advances in transformer efficiency..."
-                  className="w-full pl-12 pr-4 py-4 bg-transparent text-lab-fg placeholder:text-slate-400 focus:outline-none text-sm rounded-t-xl"
+                  className="w-full pl-12 pr-24 py-4 bg-transparent text-lab-fg placeholder:text-slate-400 focus:outline-none text-sm rounded-t-xl"
+                  autoFocus
                 />
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 pointer-events-none">
+                  <span>Enter</span>
+                  <span>↵</span>
+                </div>
               </div>
 
               <div className="border-t border-lab-border px-4 py-3 space-y-3">
@@ -250,12 +267,14 @@
                   <span className="text-xs font-medium text-lab-muted">Research Depth</span>
                   <div className="flex bg-lab-surface2 rounded-lg p-0.5 border border-lab-border">
                     <button
+                      type="button"
                       onClick={() => setDepth('quick')}
                       className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${depth === 'quick' ? 'bg-lab-surface shadow-sm text-lab-fg' : 'text-lab-muted hover:text-lab-fg'}`}
                     >
                       ⚡ Quick Brief
                     </button>
                     <button
+                      type="button"
                       onClick={() => setDepth('deep')}
                       className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${depth === 'deep' ? 'bg-lab-surface shadow-sm text-lab-fg' : 'text-lab-muted hover:text-lab-fg'}`}
                     >
@@ -272,6 +291,7 @@
                     { key: 'reddit', icon: 'MessageSquare', label: 'Reddit/Discussions' },
                   ].map(src => (
                     <button
+                      type="button"
                       key={src.key}
                       onClick={() => toggleSource(src.key)}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${sources[src.key] ? 'bg-lab-accent/10 border-lab-accent/30 text-lab-accent' : 'bg-lab-surface2 border-lab-border text-lab-muted hover:border-slate-300'}`}
@@ -285,14 +305,14 @@
 
               <div className="border-t border-lab-border px-4 py-3">
                 <button
-                  onClick={() => query.trim() && onStart({ query, depth, sources })}
+                  type="submit"
                   disabled={!query.trim()}
                   className="w-full py-2.5 rounded-lg bg-lab-accent hover:bg-lab-accent-hover disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                 >
                   <Icon name="Play" className="w-4 h-4" /> Start Research
                 </button>
               </div>
-            </div>
+            </form>
 
             <div className="mt-6 grid grid-cols-3 gap-3">
               {[
