@@ -400,75 +400,259 @@
     };
 
     /* ─── Report Panel (State B — Right Column) ─── */
-    const ReportPanel = ({ topic, reportText, isDone, timestamp }) => {
+    /* ─── Report Panel (State B — Full Width Output Area) ─── */
+    const ReportPanel = ({ topic, reportText, isDone, timestamp, steps = [], logs = [], onOpenLogs }) => {
+      const activeStep = steps.find(s => s && s.status === 'active');
+      const latestLog = logs.length > 0 ? logs[logs.length - 1] : null;
+
+      const handleDownload = () => {
+        const blob = new Blob([reportText || ''], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const cleanTitle = (topic || 'research_report').slice(0, 40).replace(/[^a-zA-Z0-9_-]/g, '_');
+        a.download = `${cleanTitle}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
       const renderContent = () => {
         if (!reportText) {
           return (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <Icon name="Loader2" className="w-10 h-10 text-lab-accent mb-4" />
-              <h4 className="text-base font-semibold text-lab-fg">Researching & Synthesizing Report...</h4>
-              <p className="text-xs text-lab-muted mt-1 max-w-md">Our CrewAI agents are retrieving web sources and writing structured markdown analysis.</p>
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-2xl mx-auto">
+              <div className="relative mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                  <Icon name="Bot" className="w-8 h-8" />
+                </div>
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+                </span>
+              </div>
+
+              <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+                {activeStep ? activeStep.label : 'Agentic Research in Progress...'}
+              </h3>
+              <p className="text-sm text-slate-500 mt-2 max-w-md">
+                Querying live web sources, verifying facts, and generating a structured report with comparison tables.
+              </p>
+
+              {/* Horizontal Multi-Agent Stepper */}
+              <div className="w-full mt-8 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {steps.map((s, idx) => (
+                  <div key={idx} className="flex flex-col items-center text-center p-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold mb-1.5 transition-all ${
+                      s.status === 'done' ? 'bg-emerald-500 text-white shadow-sm' :
+                      s.status === 'active' ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 shadow-sm' :
+                      'bg-slate-200 text-slate-500'
+                    }`}>
+                      {s.status === 'done' ? '✓' : idx + 1}
+                    </div>
+                    <span className={`text-[11px] leading-tight line-clamp-2 ${
+                      s.status === 'done' ? 'text-slate-700 font-medium' :
+                      s.status === 'active' ? 'text-indigo-600 font-bold' :
+                      'text-slate-400'
+                    }`}>
+                      {s.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Live Activity Ticker Bar */}
+              {latestLog && (
+                <div className="mt-8 w-full bg-slate-900 text-slate-300 px-4 py-3 rounded-xl font-mono text-xs flex items-center justify-between gap-3 shadow-md">
+                  <div className="flex items-center gap-2.5 truncate">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 pulse-dot flex-shrink-0"></span>
+                    <span className="truncate">{latestLog.msg}</span>
+                  </div>
+                  {onOpenLogs && (
+                    <button
+                      onClick={onOpenLogs}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 underline font-sans flex-shrink-0"
+                    >
+                      View Logs
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           );
         }
+
         if (window.marked) {
-          return <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: window.marked.parse(reportText) }} />;
+          return (
+            <div
+              className="prose prose-slate max-w-none text-slate-800 leading-relaxed text-sm sm:text-base"
+              dangerouslySetInnerHTML={{ __html: window.marked.parse(reportText) }}
+            />
+          );
         }
         return <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700 leading-relaxed">{reportText}</pre>;
       };
 
       return (
-        <div className="bg-lab-surface border border-lab-border rounded-xl flex flex-col h-full">
-          <div className="px-5 py-3 border-b border-lab-border flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-lab-fg">{topic || 'Research Report'}</h3>
-              <p className="text-[11px] text-lab-muted font-mono mt-0.5">{timestamp || 'Live Report Generation'}</p>
+        <div className="bg-lab-surface border border-lab-border rounded-xl flex flex-col h-full shadow-sm overflow-hidden">
+          {/* Output Header */}
+          <div className="px-6 py-3.5 border-b border-lab-border flex items-center justify-between flex-shrink-0 bg-white">
+            <div className="min-w-0 flex-1 pr-4">
+              <div className="flex items-center gap-2">
+                <Icon name="FileText" className="text-indigo-600" />
+                <h2 className="text-base font-bold text-slate-900 truncate">{topic || 'Research Synthesis Report'}</h2>
+              </div>
+              <p className="text-[11px] text-slate-500 font-mono mt-0.5">{timestamp || 'Live Multi-Agent Synthesis'}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigator.clipboard.writeText(reportText || '')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-lab-border text-lab-muted hover:text-lab-fg hover:border-slate-300 transition-colors"
-              >
-                <Icon name="Copy" /> Copy
-              </button>
-            </div>
+            {reportText && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => navigator.clipboard.writeText(reportText || '')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-lab-border text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                >
+                  <Icon name="Copy" /> Copy
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                  <Icon name="Download" /> Download .md
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-6">
-            {renderContent()}
+          {/* Full Width Body Content */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin px-6 sm:px-12 py-8 bg-white">
+            <div className="max-w-5xl mx-auto w-full">
+              {renderContent()}
+            </div>
           </div>
         </div>
       );
     };
 
-    /* ─── Research View (State B) ─── */
+    /* ─── Research View (State B — Full Width Screen) ─── */
     const ResearchView = ({ onBack, topic, steps, logs, reportText, isDone, timestamp }) => {
-      const [logsOpen, setLogsOpen] = useState(true);
+      const [logsDrawerOpen, setLogsDrawerOpen] = useState(false);
+      const safeSteps = Array.isArray(steps) ? steps : [];
+      const safeLogs = Array.isArray(logs) ? logs : [];
+      const done = safeSteps.filter(s => s && s.status === 'done').length;
+      const active = safeSteps.find(s => s && s.status === 'active');
+      const progress = safeSteps.length > 0 ? ((done + (isDone ? 0 : 0.5)) / safeSteps.length) * 100 : 0;
 
       return (
-        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          <div className="px-4 py-2 border-b border-lab-border bg-lab-surface flex items-center gap-3">
-            <button onClick={onBack} className="text-lab-muted hover:text-lab-fg transition-colors p-1 rounded-md hover:bg-lab-surface2">
-              <Icon name="ChevronLeft" />
-            </button>
-            <div className="flex-1 min-w-0">
+        <div className="flex-1 flex flex-col h-screen overflow-hidden bg-lab-bg relative">
+          {/* Sub Header */}
+          <div className="px-5 py-2.5 border-b border-lab-border bg-lab-surface flex items-center justify-between gap-3 flex-shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <button onClick={onBack} className="text-lab-muted hover:text-lab-fg transition-colors px-2.5 py-1 rounded-lg hover:bg-lab-surface2 flex items-center gap-1.5 text-xs font-medium border border-lab-border">
+                <Icon name="ChevronLeft" /> New Search
+              </button>
+              <div className="h-4 w-px bg-lab-border"></div>
               <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-emerald-500' : 'bg-amber-500 pulse-dot'}`}></span>
-                  {isDone ? 'Research Complete' : 'Research in Progress'}
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${isDone ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                  <span className={`w-2 h-2 rounded-full ${isDone ? 'bg-emerald-500' : 'bg-amber-500 pulse-dot'}`}></span>
+                  {isDone ? 'Research Complete' : (active?.label || 'Research in Progress...')}
                 </span>
               </div>
             </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => setLogsDrawerOpen(!logsDrawerOpen)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  logsDrawerOpen 
+                    ? 'bg-slate-900 text-white border-slate-900' 
+                    : 'border-lab-border text-lab-muted hover:text-lab-fg hover:bg-lab-surface2'
+                }`}
+                title="View Agent Terminal Logs"
+              >
+                <Icon name="Terminal" />
+                <span className="hidden sm:inline">Agent Logs</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono font-semibold">{safeLogs.length}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 flex gap-4 p-4 min-h-0">
-            <div className="w-[42%] min-w-0">
-              <ActivityFeed steps={steps} logs={logs} logsOpen={logsOpen} onToggleLogs={() => setLogsOpen(o => !o)} />
+          {/* Thin Progress Indicator */}
+          {!isDone && (
+            <div className="w-full h-1 bg-slate-100 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 via-indigo-600 to-emerald-500 transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.max(10, progress))}%` }}
+              ></div>
             </div>
-            <div className="flex-1 min-w-0">
-              <ReportPanel topic={topic} reportText={reportText} isDone={isDone} timestamp={timestamp} />
-            </div>
+          )}
+
+          {/* Full-Width Main Output Canvas */}
+          <div className="flex-1 p-4 md:p-6 min-h-0 overflow-hidden flex flex-col">
+            <ReportPanel
+              topic={topic}
+              reportText={reportText}
+              isDone={isDone}
+              timestamp={timestamp}
+              steps={safeSteps}
+              logs={safeLogs}
+              onOpenLogs={() => setLogsDrawerOpen(true)}
+            />
           </div>
+
+          {/* Optional Slide-out Activity & Logs Drawer */}
+          {logsDrawerOpen && (
+            <div className="fixed inset-y-0 right-0 w-full sm:w-[440px] bg-slate-950 text-slate-200 shadow-2xl border-l border-slate-800 z-50 flex flex-col fade-in-up">
+              <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+                <div className="flex items-center gap-2">
+                  <Icon name="Terminal" className="text-emerald-400" />
+                  <span className="text-sm font-semibold text-white">Live Agent Activity</span>
+                  <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                    {done}/{safeSteps.length}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setLogsDrawerOpen(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Progress Steps Inside Drawer */}
+              <div className="p-4 border-b border-slate-800 space-y-2 bg-slate-900/50">
+                {safeSteps.map((s, idx) => (
+                  <div key={idx} className="flex items-center gap-2.5 text-xs">
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
+                      s.status === 'done' ? 'bg-emerald-500/20 text-emerald-400' :
+                      s.status === 'active' ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-slate-800 text-slate-500'
+                    }`}>
+                      {s.status === 'done' ? '✓' : s.status === 'active' ? '●' : idx + 1}
+                    </span>
+                    <span className={s.status === 'done' ? 'text-slate-300' : s.status === 'active' ? 'text-amber-300 font-medium' : 'text-slate-500'}>
+                      {s.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Console Logs */}
+              <div className="flex-1 overflow-y-auto p-4 font-mono text-[11px] space-y-2">
+                {safeLogs.map((l, i) => (
+                  <div key={i} className="flex items-start gap-2 leading-relaxed">
+                    <span className="text-slate-600 flex-shrink-0">{l.ts}</span>
+                    <span className={`flex-shrink-0 uppercase font-semibold ${
+                      l.level === 'ok' ? 'text-emerald-400' : l.level === 'warn' ? 'text-amber-400' : 'text-cyan-400'
+                    }`}>[{l.level || 'info'}]</span>
+                    <span className="text-slate-300">{l.msg}</span>
+                  </div>
+                ))}
+                {!isDone && (
+                  <div className="flex items-center gap-2 text-emerald-400 pt-2">
+                    <span className="w-1.5 h-3 bg-emerald-400 pulse-dot"></span>
+                    <span>Multi-agent pipeline running...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       );
     };
