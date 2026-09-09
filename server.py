@@ -188,9 +188,9 @@ async def stream_research_endpoint(query: str, depth: str = "deep"):
 
         yield fmt_event("step_update", {"step_id": 2, "status": "done", "label": "Search complete"})
 
-        # Step 3: Synthesis with CrewAI
-        yield fmt_event("step_update", {"step_id": 3, "status": "active", "label": "Synthesizing research with Groq Llama-3.3-70b"})
-        yield fmt_event("log", {"ts": ts, "level": "info", "msg": "CrewAI running sequential Analyst & Writer pipeline..."})
+        # Step 3: Multi-Agent Synthesis
+        yield fmt_event("step_update", {"step_id": 3, "status": "active", "label": "Synthesizing research & comparison tables"})
+        yield fmt_event("log", {"ts": ts, "level": "info", "msg": "Multi-agent pipeline running Analyst & Synthesizer..."})
 
         try:
             report_md = await run_crew_pipeline(query, depth)
